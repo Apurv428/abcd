@@ -8,7 +8,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "SkinExpert AI — AI-Powered Skincare Analysis",
+  title: "DermAgent AI — Your Personal AI Dermatologist",
   description: "Get personalized skincare routines powered by AI. Analyze your skin, track progress, and discover products tailored to your needs.",
 };
 

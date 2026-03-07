@@ -6,11 +6,62 @@ interface WeatherData {
     city: string;
 }
 
-export async function getWeatherData(location: string): Promise<WeatherData> {
-    const apiKey = process.env.NEXT_PUBLIC_OPENWEATHERMAP_API_KEY;
+export async function getWeatherByCoords(lat: number, lon: number): Promise<WeatherData> {
+    const apiKey = process.env.NEXT_PUBLIC_OPENWEATHERMAP_API_KEY || process.env.OPENWEATHERMAP_API_KEY;
 
     if (!apiKey || apiKey === "your_openweathermap_key") {
-        // Return mock data when API key is not configured
+        return {
+            temperature: 28,
+            humidity: 65,
+            uvIndex: 6,
+            description: "Partly cloudy",
+            city: "Your Location",
+        };
+    }
+
+    try {
+        // Get weather data using coordinates
+        const weatherRes = await fetch(
+            `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&units=metric&appid=${apiKey}`
+        );
+        const weather = await weatherRes.json();
+
+        // Get UV index
+        let uvIndex = 5;
+        try {
+            const uvRes = await fetch(
+                `https://api.openweathermap.org/data/2.5/uvi?lat=${lat}&lon=${lon}&appid=${apiKey}`
+            );
+            const uvData = await uvRes.json();
+            uvIndex = Math.round(uvData.value ?? 5);
+        } catch {
+            // UV API might fail, use estimated value based on time
+            const hour = new Date().getHours();
+            uvIndex = hour >= 10 && hour <= 16 ? 7 : 3;
+        }
+
+        return {
+            temperature: Math.round(weather.main?.temp ?? 28),
+            humidity: weather.main?.humidity ?? 65,
+            uvIndex,
+            description: weather.weather?.[0]?.description ?? "Clear",
+            city: weather.name ?? "Your Location",
+        };
+    } catch {
+        return {
+            temperature: 28,
+            humidity: 65,
+            uvIndex: 6,
+            description: "Data unavailable",
+            city: "Your Location",
+        };
+    }
+}
+
+export async function getWeatherData(location: string): Promise<WeatherData> {
+    const apiKey = process.env.NEXT_PUBLIC_OPENWEATHERMAP_API_KEY || process.env.OPENWEATHERMAP_API_KEY;
+
+    if (!apiKey || apiKey === "your_openweathermap_key") {
         return {
             temperature: 28,
             humidity: 65,
@@ -32,26 +83,7 @@ export async function getWeatherData(location: string): Promise<WeatherData> {
         }
 
         const { lat, lon } = geoData[0];
-
-        // Get weather data
-        const weatherRes = await fetch(
-            `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&units=metric&appid=${apiKey}`
-        );
-        const weather = await weatherRes.json();
-
-        // Get UV index
-        const uvRes = await fetch(
-            `https://api.openweathermap.org/data/2.5/uvi?lat=${lat}&lon=${lon}&appid=${apiKey}`
-        );
-        const uvData = await uvRes.json();
-
-        return {
-            temperature: Math.round(weather.main.temp),
-            humidity: weather.main.humidity,
-            uvIndex: Math.round(uvData.value ?? 5),
-            description: weather.weather?.[0]?.description ?? "Clear",
-            city: weather.name ?? location,
-        };
+        return getWeatherByCoords(lat, lon);
     } catch {
         return {
             temperature: 28,

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Sparkles, ScanFace, Sun, ShoppingBag, BookOpen, User, Home } from "lucide-react";
+import { Sparkles, ScanFace, Sun, ShoppingBag, BookOpen, User, Home, Package } from "lucide-react";
 import { clsx } from "clsx";
 
 const navItems = [
@@ -10,6 +10,7 @@ const navItems = [
     { href: "/dashboard/analyze", label: "Skin Analysis", icon: ScanFace },
     { href: "/dashboard/routine", label: "My Routine", icon: Sun },
     { href: "/dashboard/products", label: "Products", icon: ShoppingBag },
+    { href: "/dashboard/shelf", label: "My Shelf", icon: Package },
     { href: "/dashboard/journal", label: "Skin Journal", icon: BookOpen },
     { href: "/dashboard/profile", label: "Profile", icon: User },
 ];
@@ -41,7 +42,7 @@ export default function Sidebar() {
                 </div>
                 <div>
                     <div style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--text-primary)" }}>
-                        SkinExpert
+                        DermAgent
                     </div>
                     <div style={{ fontSize: "0.65rem", fontWeight: 500, color: "var(--accent-purple)", letterSpacing: "2px", textTransform: "uppercase" }}>
                         AI
@@ -82,7 +83,7 @@ export default function Sidebar() {
 
             {/* Footer */}
             <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", padding: "0 8px" }}>
-                © 2026 SkinExpert AI
+                © 2026 DermAgent AI
             </div>
         </aside>
     );

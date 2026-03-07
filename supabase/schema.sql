@@ -123,3 +123,29 @@ create policy "Users can view own product recs" on public.product_recommendation
   );
 create policy "Service can insert product recs" on public.product_recommendations
   for insert with check (true);
+
+-- 6. Virtual Shelf Products (for tracking expiry)
+create table if not exists public.shelf_products (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references auth.users on delete cascade not null,
+  name text not null,
+  brand text,
+  category text,
+  opened_date date,
+  expiry_date date,
+  pao_months integer check (pao_months >= 1 and pao_months <= 60),
+  notes text,
+  created_at timestamptz default now()
+);
+
+alter table public.shelf_products enable row level security;
+
+create policy "Users can view own shelf products" on public.shelf_products
+  for select using (auth.uid() = user_id);
+create policy "Users can insert own shelf products" on public.shelf_products
+  for insert with check (auth.uid() = user_id);
+create policy "Users can update own shelf products" on public.shelf_products
+  for update using (auth.uid() = user_id);
+create policy "Users can delete own shelf products" on public.shelf_products
+  for delete using (auth.uid() = user_id);
+

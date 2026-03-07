@@ -55,7 +55,7 @@ export default function LoginPage() {
                         <Sparkles size={28} color="white" />
                     </div>
                     <h1 style={{ fontSize: "1.6rem", fontWeight: 700, marginBottom: "6px" }}>Welcome back</h1>
-                    <p style={{ color: "var(--text-secondary)", fontSize: "0.9rem" }}>Sign in to your SkinExpert AI account</p>
+                    <p style={{ color: "var(--text-secondary)", fontSize: "0.9rem" }}>Sign in to your DermAgent AI account</p>
                 </div>
 
                 <GlassCard hover={false}>

@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import GlassCard from "@/components/ui/GlassCard";
 import GlassButton from "@/components/ui/GlassButton";
-import { Sun, Moon, CloudRain, Thermometer, Droplets, RefreshCw } from "lucide-react";
+import { Sun, Moon, CloudRain, Thermometer, Droplets, RefreshCw, MapPin, AlertTriangle } from "lucide-react";
 
 interface RoutineStep {
     order: number;
@@ -28,11 +28,18 @@ export default function RoutinePage() {
     const [loading, setLoading] = useState(false);
     const [activeTab, setActiveTab] = useState<"morning" | "evening">("morning");
     const [generated, setGenerated] = useState(false);
+    const [locationStatus, setLocationStatus] = useState<"pending" | "granted" | "denied" | "error">("pending");
 
-    const generateRoutine = async () => {
+    const generateRoutine = useCallback(async (coords?: { lat: number; lon: number }) => {
         setLoading(true);
         try {
-            const res = await fetch("/api/routine", { method: "POST" });
+            const body = coords ? JSON.stringify({ lat: coords.lat, lon: coords.lon }) : "{}";
+            
+            const res = await fetch("/api/routine", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body,
+            });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error);
 
@@ -45,12 +52,37 @@ export default function RoutinePage() {
         } finally {
             setLoading(false);
         }
+    }, []);
+
+    const handleGenerateWithLocation = () => {
+        setLoading(true);
+        
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    setLocationStatus("granted");
+                    generateRoutine({
+                        lat: position.coords.latitude,
+                        lon: position.coords.longitude,
+                    });
+                },
+                () => {
+                    setLocationStatus("denied");
+                    // Still generate routine without coordinates
+                    generateRoutine();
+                },
+                { timeout: 10000 }
+            );
+        } else {
+            setLocationStatus("error");
+            generateRoutine();
+        }
     };
 
     const steps = activeTab === "morning" ? morningSteps : eveningSteps;
 
     return (
-        <div className="animate-fade-in">
+        <div className="animate-fade-in" data-testid="routine-page">
             <div style={{ marginBottom: "24px" }}>
                 <h1 style={{ fontSize: "1.8rem", fontWeight: 700, marginBottom: "4px" }}>My Skincare Routine</h1>
                 <p style={{ color: "var(--text-secondary)", fontSize: "0.9rem" }}>Personalized and weather-adaptive daily routine</p>
@@ -64,7 +96,26 @@ export default function RoutinePage() {
                         <p style={{ color: "var(--text-secondary)", fontSize: "0.9rem", maxWidth: "400px", margin: "0 auto 24px", lineHeight: 1.6 }}>
                             Our AI will analyze your skin profile AND local weather to create personalized morning & evening routines.
                         </p>
-                        <GlassButton onClick={generateRoutine} loading={loading}>
+                        
+                        <div style={{ 
+                            background: "rgba(168, 85, 247, 0.1)", 
+                            border: "1px solid rgba(168, 85, 247, 0.2)",
+                            borderRadius: "12px",
+                            padding: "16px",
+                            marginBottom: "24px",
+                            maxWidth: "400px",
+                            margin: "0 auto 24px",
+                        }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px", justifyContent: "center", marginBottom: "8px" }}>
+                                <MapPin size={16} color="var(--accent-purple)" />
+                                <span style={{ fontSize: "0.85rem", fontWeight: 600 }}>Location-Aware Routine</span>
+                            </div>
+                            <p style={{ fontSize: "0.8rem", color: "var(--text-secondary)" }}>
+                                Allow location access to get weather-specific recommendations (high UV alerts, humidity adjustments).
+                            </p>
+                        </div>
+
+                        <GlassButton onClick={handleGenerateWithLocation} loading={loading} data-testid="generate-routine-btn">
                             <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                                 <RefreshCw size={16} /> Generate My Routine
                             </span>
@@ -98,6 +149,34 @@ export default function RoutinePage() {
                                     <span style={{ fontSize: "0.85rem", fontWeight: 600 }}>UV {weather.uvIndex}</span>
                                 </div>
                             </div>
+
+                            {/* Weather Alerts */}
+                            {(weather.uvIndex >= 6 || weather.humidity < 30) && (
+                                <div style={{ marginTop: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
+                                    {weather.uvIndex >= 6 && (
+                                        <div style={{
+                                            display: "flex", alignItems: "center", gap: "8px",
+                                            background: "rgba(239, 68, 68, 0.1)",
+                                            border: "1px solid rgba(239, 68, 68, 0.2)",
+                                            borderRadius: "8px", padding: "8px 12px", fontSize: "0.8rem",
+                                        }} data-testid="uv-alert">
+                                            <AlertTriangle size={14} color="#ef4444" />
+                                            <strong>High UV Alert:</strong> Apply SPF 50+ sunscreen and reapply every 2 hours outdoors!
+                                        </div>
+                                    )}
+                                    {weather.humidity < 30 && (
+                                        <div style={{
+                                            display: "flex", alignItems: "center", gap: "8px",
+                                            background: "rgba(59, 130, 246, 0.1)",
+                                            border: "1px solid rgba(59, 130, 246, 0.2)",
+                                            borderRadius: "8px", padding: "8px 12px", fontSize: "0.8rem",
+                                        }} data-testid="humidity-alert">
+                                            <Droplets size={14} color="#3b82f6" />
+                                            <strong>Low Humidity:</strong> Add a hydrating serum to your routine tonight!
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </GlassCard>
                     )}
 
@@ -113,6 +192,7 @@ export default function RoutinePage() {
                                 color: "var(--text-primary)", fontWeight: activeTab === "morning" ? 600 : 400,
                                 fontFamily: "Inter", fontSize: "0.9rem", transition: "all 0.2s",
                             }}
+                            data-testid="morning-tab"
                         >
                             <Sun size={18} color="#f59e0b" /> Morning Routine
                         </button>
@@ -126,6 +206,7 @@ export default function RoutinePage() {
                                 color: "var(--text-primary)", fontWeight: activeTab === "evening" ? 600 : 400,
                                 fontFamily: "Inter", fontSize: "0.9rem", transition: "all 0.2s",
                             }}
+                            data-testid="evening-tab"
                         >
                             <Moon size={18} color="#6366f1" /> Evening Routine
                         </button>
@@ -134,7 +215,7 @@ export default function RoutinePage() {
                     {/* Steps */}
                     <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
                         {steps.map((step, i) => (
-                            <GlassCard key={i} hover={false} className="animate-slide-up" >
+                            <GlassCard key={i} hover={false} className="animate-slide-up" data-testid={`routine-step-${i}`}>
                                 <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
                                     <div style={{
                                         width: "50px", height: "50px", borderRadius: "14px",
@@ -165,7 +246,7 @@ export default function RoutinePage() {
                     </div>
 
                     <div style={{ marginTop: "20px" }}>
-                        <GlassButton variant="secondary" onClick={generateRoutine} loading={loading}>
+                        <GlassButton variant="secondary" onClick={handleGenerateWithLocation} loading={loading} data-testid="regenerate-routine-btn">
                             <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                                 <RefreshCw size={16} /> Regenerate Routine
                             </span>

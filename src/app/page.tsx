@@ -14,7 +14,7 @@ export default function HomePage() {
           }}>
             <Sparkles size={20} color="white" />
           </div>
-          <span style={{ fontSize: "1.2rem", fontWeight: 700 }}>SkinExpert AI</span>
+          <span style={{ fontSize: "1.2rem", fontWeight: 700 }}>DermAgent AI</span>
         </div>
         <div style={{ display: "flex", gap: "12px" }}>
           <Link href="/login" className="glass-button-secondary" style={{ padding: "10px 24px", borderRadius: "10px", textDecoration: "none", fontSize: "0.9rem" }}>
@@ -73,7 +73,7 @@ export default function HomePage() {
       {/* Footer Disclaimer */}
       <footer style={{ padding: "20px", textAlign: "center" }}>
         <div className="disclaimer-banner" style={{ maxWidth: "700px", margin: "0 auto" }}>
-          ⚕️ SkinExpert AI is a <strong>General Wellness Product</strong>. It does not provide medical diagnosis or treatment. Consult a dermatologist for medical concerns.
+          ⚕️ DermAgent AI is a <strong>General Wellness Product</strong>. It does not provide medical diagnosis or treatment. Consult a dermatologist for medical concerns.
         </div>
       </footer>
     </div>

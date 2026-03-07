@@ -168,7 +168,7 @@ export default function RegisterPage() {
                 </GlassCard>
 
                 <div className="disclaimer-banner" style={{ marginTop: "16px" }}>
-                    By creating an account you agree to our Terms of Service and acknowledge that SkinExpert AI is a general wellness product.
+                    By creating an account you agree to our Terms of Service and acknowledge that DermAgent AI is a general wellness product.
                 </div>
             </div>
         </div>
