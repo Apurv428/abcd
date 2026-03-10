@@ -7,6 +7,12 @@ export async function GET(request: Request) {
     const code = searchParams.get("code");
     const next = searchParams.get("next") ?? "/dashboard";
 
+    // Use the actual site URL, not the internal origin (which might be localhost)
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 
+                    (origin.includes('localhost') 
+                        ? 'https://5170efd5-d913-4d8a-ace0-4282be6d0ba9.preview.emergentagent.com' 
+                        : origin);
+
     if (code) {
         const cookieStore = await cookies();
         const supabase = createServerClient(
@@ -32,9 +38,9 @@ export async function GET(request: Request) {
 
         const { error } = await supabase.auth.exchangeCodeForSession(code);
         if (!error) {
-            return NextResponse.redirect(`${origin}${next}`);
+            return NextResponse.redirect(`${siteUrl}${next}`);
         }
     }
 
-    return NextResponse.redirect(`${origin}/login?error=auth_failed`);
+    return NextResponse.redirect(`${siteUrl}/login?error=auth_failed`);
 }
