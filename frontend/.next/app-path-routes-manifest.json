@@ -1,0 +1,21 @@
+{
+  "/_global-error/page": "/_global-error",
+  "/_not-found/page": "/_not-found",
+  "/api/analyze/route": "/api/analyze",
+  "/api/journal/route": "/api/journal",
+  "/api/routine/route": "/api/routine",
+  "/auth/callback/route": "/auth/callback",
+  "/dashboard/analyze/page": "/dashboard/analyze",
+  "/dashboard/journal/page": "/dashboard/journal",
+  "/dashboard/page": "/dashboard",
+  "/dashboard/products/page": "/dashboard/products",
+  "/dashboard/profile/page": "/dashboard/profile",
+  "/dashboard/routine/page": "/dashboard/routine",
+  "/dashboard/shelf/page": "/dashboard/shelf",
+  "/favicon.ico/route": "/favicon.ico",
+  "/login/page": "/login",
+  "/page": "/",
+  "/privacy/page": "/privacy",
+  "/register/page": "/register",
+  "/terms/page": "/terms"
+}
