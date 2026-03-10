@@ -32,9 +32,14 @@ export default function LoginPage() {
     };
 
     const handleGoogleLogin = async () => {
+        // Use the actual site URL for OAuth redirect, not localhost
+        const siteUrl = typeof window !== 'undefined' && window.location.hostname !== 'localhost' 
+            ? window.location.origin 
+            : 'https://5170efd5-d913-4d8a-ace0-4282be6d0ba9.preview.emergentagent.com';
+        
         const { error } = await supabase.auth.signInWithOAuth({
             provider: "google",
-            options: { redirectTo: `${window.location.origin}/auth/callback` },
+            options: { redirectTo: `${siteUrl}/auth/callback` },
         });
         if (error) setError(error.message);
     };
