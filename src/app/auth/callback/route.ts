@@ -1,42 +1,58 @@
-import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 
 export async function GET(request: Request) {
-    const { searchParams, origin } = new URL(request.url);
-    const code = searchParams.get("code");
-    const next = searchParams.get("next") ?? "/dashboard";
+  const { searchParams } = new URL(request.url);
+  const code = searchParams.get("code");
+  const origin = new URL(request.url).origin;
 
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || origin;
-
-    if (code) {
-        const cookieStore = await cookies();
-        const supabase = createServerClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-            {
-                cookies: {
-                    getAll() {
-                        return cookieStore.getAll();
-                    },
-                    setAll(cookiesToSet) {
-                        try {
-                            cookiesToSet.forEach(({ name, value, options }) =>
-                                cookieStore.set(name, value, options)
-                            );
-                        } catch {
-                            // ignore
-                        }
-                    },
-                },
+  if (code) {
+    const cookieStore = await cookies();
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return cookieStore.getAll();
+          },
+          setAll(cookiesToSet) {
+            try {
+              cookiesToSet.forEach(({ name, value, options }) =>
+                cookieStore.set(name, value, options)
+              );
+            } catch {
+              // ignore cookie set errors in middleware
             }
-        );
+          },
+        },
+      }
+    );
 
-        const { error } = await supabase.auth.exchangeCodeForSession(code);
-        if (!error) {
-            return NextResponse.redirect(`${siteUrl}${next}`);
+    const { error } = await supabase.auth.exchangeCodeForSession(code);
+
+    if (!error) {
+      // Check if onboarding is complete
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("onboarding_complete")
+          .eq("id", user.id)
+          .single();
+
+        if (profile?.onboarding_complete) {
+          return NextResponse.redirect(`${origin}/dashboard`);
         }
+        return NextResponse.redirect(`${origin}/onboarding`);
+      }
     }
+  }
 
-    return NextResponse.redirect(`${siteUrl}/login?error=auth_failed`);
+  // Fallback to login on error
+  return NextResponse.redirect(`${origin}/login`);
 }

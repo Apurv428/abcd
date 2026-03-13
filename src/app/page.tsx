@@ -1,80 +1,117 @@
 import Link from "next/link";
-import { Sparkles, ArrowRight, ShieldCheck, Brain, Leaf } from "lucide-react";
+import { Sparkles, ScanFace, Shield, CloudSun, Bell, ArrowRight } from "lucide-react";
 
-export default function HomePage() {
+const features = [
+  { icon: ScanFace, title: "Gemini Vision AI", desc: "Advanced skin analysis powered by Google Gemini 2.0 Flash.", gradient: "var(--gradient-brand)" },
+  { icon: Shield, title: "FaceDefender™", desc: "Privacy-first eye region anonymization before analysis.", gradient: "var(--gradient-primary)" },
+  { icon: CloudSun, title: "Weather-Adaptive Routines", desc: "Skincare routines that adapt to your local UV & humidity.", gradient: "var(--gradient-secondary)" },
+  { icon: Bell, title: "Live UV Alerts", desc: "Real-time sun protection reminders based on your location.", gradient: "linear-gradient(135deg, #f59e0b, #ef4444)" },
+];
+
+export default function LandingPage() {
   return (
-    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
-      {/* Hero Section */}
-      <nav style={{ padding: "20px 40px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+    <div style={{ minHeight: "100vh" }}>
+      {/* Sticky Nav */}
+      <nav style={{
+        position: "sticky", top: 0, zIndex: 50,
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        padding: "16px 40px", borderBottom: "1px solid var(--glass-border)",
+        background: "rgba(6, 6, 18, 0.9)", backdropFilter: "blur(20px)",
+      }}>
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
           <div style={{
-            width: "38px", height: "38px", borderRadius: "12px",
-            background: "var(--gradient-primary)", display: "flex",
+            width: "36px", height: "36px", borderRadius: "11px",
+            background: "var(--gradient-brand)", display: "flex",
             alignItems: "center", justifyContent: "center",
           }}>
-            <Sparkles size={20} color="white" />
+            <Sparkles size={18} color="white" />
           </div>
-          <span style={{ fontSize: "1.2rem", fontWeight: 700 }}>DermAgent AI</span>
+          <span style={{ fontWeight: 700, fontSize: "1.1rem" }}>DermAgent AI</span>
         </div>
         <div style={{ display: "flex", gap: "12px" }}>
-          <Link href="/login" className="glass-button-secondary" style={{ padding: "10px 24px", borderRadius: "10px", textDecoration: "none", fontSize: "0.9rem" }}>
-            Log In
+          <Link href="/login" className="glass-button-secondary" style={{ textDecoration: "none", padding: "8px 20px", fontSize: "0.85rem" }}>
+            Sign In
           </Link>
-          <Link href="/register" className="glass-button" style={{ textDecoration: "none", padding: "10px 24px", fontSize: "0.9rem" }}>
+          <Link href="/register" className="glass-button" style={{ textDecoration: "none", padding: "8px 20px", fontSize: "0.85rem" }}>
             Get Started
           </Link>
         </div>
       </nav>
 
-      <main style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", padding: "40px 20px", maxWidth: "900px", margin: "0 auto" }}>
-        <div className="animate-fade-in" style={{ marginBottom: "20px" }}>
-          <span style={{
-            background: "rgba(168, 85, 247, 0.15)", border: "1px solid rgba(168, 85, 247, 0.3)",
-            borderRadius: "100px", padding: "6px 16px", fontSize: "0.8rem", color: "var(--accent-purple)", fontWeight: 500,
-          }}>
-            ✨ Powered by Google Gemini AI
-          </span>
+      {/* Hero */}
+      <section style={{ padding: "100px 40px 80px", textAlign: "center", maxWidth: "800px", margin: "0 auto" }}>
+        <div style={{
+          display: "inline-block", padding: "6px 18px", borderRadius: "20px",
+          background: "rgba(45, 212, 191, 0.08)", border: "1px solid rgba(45, 212, 191, 0.2)",
+          fontSize: "0.8rem", color: "var(--accent-teal)", fontWeight: 600,
+          marginBottom: "28px",
+        }}>
+          ✨ Powered by Google Gemini AI
         </div>
 
-        <h1 className="animate-fade-in" style={{ fontSize: "3.5rem", fontWeight: 800, lineHeight: 1.1, marginBottom: "24px" }}>
-          Your Personal
-          <br />
-          <span style={{ background: "var(--gradient-primary)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+        <h1 style={{
+          fontSize: "3.2rem", fontWeight: 700, lineHeight: 1.15,
+          marginBottom: "20px", fontFamily: "var(--font-heading)",
+        }}>
+          Your Personal{" "}
+          <span style={{
+            background: "var(--gradient-brand)",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+            backgroundClip: "text",
+          }}>
             AI Dermatologist
           </span>
         </h1>
-
-        <p className="animate-fade-in" style={{ fontSize: "1.15rem", color: "var(--text-secondary)", maxWidth: "600px", lineHeight: 1.7, marginBottom: "40px" }}>
-          Upload a photo, get instant skin analysis, personalized routines adjusted to your local weather, and curated product recommendations—all private and secure.
+        <p style={{
+          color: "var(--text-secondary)", fontSize: "1.15rem", lineHeight: 1.7,
+          maxWidth: "600px", margin: "0 auto 36px",
+        }}>
+          Analyze your skin with advanced AI vision, get weather-adaptive routines, and discover products tailored to your unique skin profile.
         </p>
-
-        <div className="animate-fade-in" style={{ display: "flex", gap: "16px", marginBottom: "60px" }}>
-          <Link href="/register" className="glass-button" style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: "8px", padding: "14px 32px", fontSize: "1rem" }}>
+        <div style={{ display: "flex", gap: "14px", justifyContent: "center" }}>
+          <Link href="/register" className="glass-button" style={{ textDecoration: "none", padding: "14px 32px", fontSize: "1rem", display: "flex", alignItems: "center", gap: "8px" }}>
             Start Free Analysis <ArrowRight size={18} />
           </Link>
+          <Link href="/login" className="glass-button-secondary" style={{ textDecoration: "none", padding: "14px 32px", fontSize: "1rem" }}>
+            Sign In
+          </Link>
         </div>
+      </section>
 
-        {/* Feature Cards */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "20px", width: "100%" }}>
-          {[
-            { icon: Brain, title: "AI Skin Analysis", desc: "Vision AI analyzes your skin type, concerns, and health score." },
-            { icon: ShieldCheck, title: "Privacy First", desc: "FaceDefender™ mask anonymizes your photos before analysis." },
-            { icon: Leaf, title: "Smart Routines", desc: "Weather-adaptive morning & evening routines generated by AI." },
-          ].map((f, i) => (
-            <div key={i} className="glass-card" style={{ padding: "28px", textAlign: "left" }}>
-              <f.icon size={28} color="var(--accent-purple)" style={{ marginBottom: "16px" }} />
-              <h3 style={{ fontSize: "1.05rem", fontWeight: 600, marginBottom: "8px" }}>{f.title}</h3>
-              <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)", lineHeight: 1.6 }}>{f.desc}</p>
+      {/* Features */}
+      <section style={{ padding: "0 40px 80px", maxWidth: "960px", margin: "0 auto" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "20px" }}>
+          {features.map((f, i) => (
+            <div key={i} className="glass-card" style={{ padding: "28px" }}>
+              <div style={{
+                width: "48px", height: "48px", borderRadius: "14px",
+                background: f.gradient, display: "flex",
+                alignItems: "center", justifyContent: "center",
+                marginBottom: "16px",
+              }}>
+                <f.icon size={24} color="white" />
+              </div>
+              <h3 style={{ fontWeight: 600, fontSize: "1.05rem", marginBottom: "6px" }}>{f.title}</h3>
+              <p style={{ color: "var(--text-secondary)", fontSize: "0.9rem", lineHeight: 1.6 }}>{f.desc}</p>
             </div>
           ))}
         </div>
-      </main>
+      </section>
 
-      {/* Footer Disclaimer */}
-      <footer style={{ padding: "20px", textAlign: "center" }}>
-        <div className="disclaimer-banner" style={{ maxWidth: "700px", margin: "0 auto" }}>
-          ⚕️ DermAgent AI is a <strong>General Wellness Product</strong>. It does not provide medical diagnosis or treatment. Consult a dermatologist for medical concerns.
+      {/* Footer */}
+      <footer style={{
+        padding: "24px 40px", borderTop: "1px solid var(--glass-border)",
+        textAlign: "center", fontSize: "0.8rem", color: "var(--text-muted)",
+      }}>
+        <div className="disclaimer-banner" style={{ maxWidth: "700px", margin: "0 auto 16px" }}>
+          ⚕️ DermAgent AI is a general wellness product. It does not provide medical diagnosis or treatment. Always consult a licensed dermatologist.
         </div>
+        <div style={{ display: "flex", gap: "16px", justifyContent: "center" }}>
+          <Link href="/privacy" style={{ color: "var(--text-muted)", textDecoration: "none" }}>Privacy</Link>
+          <Link href="/terms" style={{ color: "var(--text-muted)", textDecoration: "none" }}>Terms</Link>
+        </div>
+        <p style={{ marginTop: "8px" }}>© {new Date().getFullYear()} DermAgent AI. All rights reserved.</p>
       </footer>
     </div>
   );

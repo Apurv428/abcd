@@ -24,12 +24,12 @@ export async function GET() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { data: entries, error } = await supabase
-      .from("journal_entries").select("*")
+    const { data: products, error } = await supabase
+      .from("shelf_products").select("*")
       .eq("user_id", user.id).order("created_at", { ascending: false });
 
     if (error) throw error;
-    return NextResponse.json({ entries: entries || [] });
+    return NextResponse.json({ products: products || [] });
   } catch (err: unknown) {
     return NextResponse.json({ error: err instanceof Error ? err.message : "Failed" }, { status: 500 });
   }
@@ -42,17 +42,25 @@ export async function POST(request: NextRequest) {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const body = await request.json();
-    const { notes, mood, skinScore } = body;
-    if (!notes) return NextResponse.json({ error: "Notes are required" }, { status: 400 });
+    const { name, brand, category, opened_date, pao_months, notes } = body;
 
-    const { data, error } = await supabase.from("journal_entries").insert({
-      user_id: user.id,
-      notes, mood: mood || "good",
-      skin_score: skinScore ?? null,
+    if (!name) return NextResponse.json({ error: "Product name is required" }, { status: 400 });
+
+    let expiry_date = null;
+    if (opened_date && pao_months) {
+      const d = new Date(opened_date);
+      d.setMonth(d.getMonth() + parseInt(pao_months));
+      expiry_date = d.toISOString().split("T")[0];
+    }
+
+    const { data, error } = await supabase.from("shelf_products").insert({
+      user_id: user.id, name, brand: brand || null, category: category || null,
+      opened_date: opened_date || null, pao_months: pao_months ? parseInt(pao_months) : null,
+      expiry_date, notes: notes || null,
     }).select().single();
 
     if (error) throw error;
-    return NextResponse.json({ entry: data });
+    return NextResponse.json({ product: data });
   } catch (err: unknown) {
     return NextResponse.json({ error: err instanceof Error ? err.message : "Failed" }, { status: 500 });
   }
@@ -66,9 +74,9 @@ export async function DELETE(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
-    if (!id) return NextResponse.json({ error: "Missing entry ID" }, { status: 400 });
+    if (!id) return NextResponse.json({ error: "Missing product ID" }, { status: 400 });
 
-    const { error } = await supabase.from("journal_entries").delete().eq("id", id).eq("user_id", user.id);
+    const { error } = await supabase.from("shelf_products").delete().eq("id", id).eq("user_id", user.id);
     if (error) throw error;
     return NextResponse.json({ success: true });
   } catch (err: unknown) {

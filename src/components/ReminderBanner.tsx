@@ -1,198 +1,213 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Bell, X, Sun, Droplets, MapPin, AlertTriangle } from "lucide-react";
+import { getWeatherByCoords, getWeatherData, buildWeatherAlerts, type WeatherAlert } from "@/lib/weather";
+import { createClient } from "@/lib/supabase";
+import { X, MapPin, Sparkles } from "lucide-react";
+import { getCityFromCoords } from "@/lib/weather";
 
-interface WeatherData {
-    temperature: number;
-    humidity: number;
-    uvIndex: number;
-    description: string;
-    city: string;
+interface AINudge {
+  id: string;
+  message: string;
+  type: "location" | "time" | "weather";
+  severity: "low" | "medium" | "high";
 }
 
 export default function ReminderBanner() {
-    const [visible, setVisible] = useState(false);
-    const [message, setMessage] = useState("");
-    const [alertType, setAlertType] = useState<"routine" | "uv" | "humidity">("routine");
-    const [weather, setWeather] = useState<WeatherData | null>(null);
-    const [locationLoading, setLocationLoading] = useState(false);
+  const [alerts, setAlerts] = useState<WeatherAlert[]>([]);
+  const [aiNudges, setAiNudges] = useState<AINudge[]>([]);
+  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  const [city, setCity] = useState("");
+  const [prevCity, setPrevCity] = useState<string | null>(null);
 
-    const fetchWeatherByCoords = useCallback(async (lat: number, lon: number) => {
-        const apiKey = process.env.NEXT_PUBLIC_OPENWEATHERMAP_API_KEY;
-        if (!apiKey) return null;
-
+  const fetchAlerts = useCallback(async () => {
+    try {
+      // Try geolocation first
+      let weather;
+      try {
+        const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
+          navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 })
+        );
+        weather = await getWeatherByCoords(pos.coords.latitude, pos.coords.longitude);
+      } catch {
+        // Fallback to profile city
         try {
-            const [weatherRes, uvRes] = await Promise.all([
-                fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&units=metric&appid=${apiKey}`),
-                fetch(`https://api.openweathermap.org/data/2.5/uvi?lat=${lat}&lon=${lon}&appid=${apiKey}`)
-            ]);
-
-            const weatherData = await weatherRes.json();
-            const uvData = await uvRes.json();
-
-            return {
-                temperature: Math.round(weatherData.main?.temp || 28),
-                humidity: weatherData.main?.humidity || 65,
-                uvIndex: Math.round(uvData.value || 5),
-                description: weatherData.weather?.[0]?.description || "Clear",
-                city: weatherData.name || "Your Location",
-            };
-        } catch (err) {
-            console.error("Weather fetch error:", err);
-            return null;
-        }
-    }, []);
-
-    const checkWeatherAlerts = useCallback((data: WeatherData) => {
-        // High UV Alert (UV >= 6)
-        if (data.uvIndex >= 6) {
-            setAlertType("uv");
-            setMessage(`☀️ UV levels are HIGH (${data.uvIndex}) in ${data.city}! Remember to re-apply your SPF 50+ sunscreen now.`);
-            setVisible(true);
-            return;
-        }
-
-        // Low Humidity Alert (< 30%)
-        if (data.humidity < 30) {
-            setAlertType("humidity");
-            setMessage(`💧 Low humidity (${data.humidity}%) in ${data.city}. Consider adding a hydrating serum to your evening routine.`);
-            setVisible(true);
-            return;
-        }
-
-        // Time-based routine reminders
-        const hour = new Date().getHours();
-        if (hour >= 6 && hour < 10) {
-            setAlertType("routine");
-            setMessage("☀️ Good morning! Time for your AM skincare routine.");
-            setVisible(true);
-        } else if (hour >= 18 && hour < 22) {
-            setAlertType("routine");
-            setMessage("🌙 Good evening! Don't forget your PM skincare routine.");
-            setVisible(true);
-        } else if (hour >= 12 && hour < 14 && data.uvIndex >= 4) {
-            setAlertType("uv");
-            setMessage(`🧴 Midday reminder: Re-apply sunscreen! UV index is ${data.uvIndex} in ${data.city}.`);
-            setVisible(true);
-        }
-    }, []);
-
-    useEffect(() => {
-        const getLocationAndWeather = async () => {
-            setLocationLoading(true);
-
-            // Try browser geolocation first
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(
-                    async (position) => {
-                        const { latitude, longitude } = position.coords;
-                        const data = await fetchWeatherByCoords(latitude, longitude);
-                        if (data) {
-                            setWeather(data);
-                            checkWeatherAlerts(data);
-                        }
-                        setLocationLoading(false);
-                    },
-                    async () => {
-                        // Fallback to IP-based location or default
-                        console.log("Geolocation denied, using default alerts");
-                        setLocationLoading(false);
-                        
-                        // Show time-based reminder as fallback
-                        const hour = new Date().getHours();
-                        if (hour >= 6 && hour < 10) {
-                            setMessage("☀️ Good morning! Time for your AM skincare routine.");
-                            setVisible(true);
-                        } else if (hour >= 18 && hour < 22) {
-                            setMessage("🌙 Good evening! Don't forget your PM skincare routine.");
-                            setVisible(true);
-                        } else if (hour >= 12 && hour < 14) {
-                            setMessage("🧴 Quick reminder: Reapply sunscreen if you're outdoors!");
-                            setVisible(true);
-                        }
-                    },
-                    { timeout: 5000 }
-                );
-            } else {
-                setLocationLoading(false);
+          const supabase = createClient();
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            const { data: profile } = await supabase.from("profiles").select("city").eq("id", user.id).single();
+            if (profile?.city) {
+              weather = await getWeatherData(profile.city);
             }
-        };
+          }
+        } catch { /* ignore */ }
+      }
 
-        getLocationAndWeather();
+      if (weather) {
+        // Sync with profile if detected automatically
+        try {
+          const supabase = createClient();
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user && weather.city && weather.city !== "Your Location") {
+            // Only update if profile city is different or missing
+            const { data: profile } = await supabase.from("profiles").select("city, country").eq("id", user.id).single();
+            if (profile && profile.city !== weather.city) {
+              await supabase.from("profiles").update({
+                city: weather.city,
+                updated_at: new Date().toISOString()
+              }).eq("id", user.id);
+            }
+          }
+        } catch { /* ignore sync failure */ }
+      }
 
-        // Re-check every 30 minutes for UV changes
-        const interval = setInterval(getLocationAndWeather, 30 * 60 * 1000);
-        return () => clearInterval(interval);
-    }, [fetchWeatherByCoords, checkWeatherAlerts]);
+      if (!weather) {
+        // Time-based fallback
+        weather = { temperature: 25, humidity: 55, uvIndex: 0, description: "Clear", city: "Your Location" };
+      }
 
-    if (!visible) return null;
+      setCity(weather.city);
+      const newAlerts = buildWeatherAlerts(weather);
+      setAlerts(newAlerts);
 
-    const getBannerStyle = () => {
-        switch (alertType) {
-            case "uv":
-                return {
-                    background: "linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(245, 158, 11, 0.15))",
-                    border: "1px solid rgba(239, 68, 68, 0.3)",
-                };
-            case "humidity":
-                return {
-                    background: "linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(20, 184, 166, 0.15))",
-                    border: "1px solid rgba(59, 130, 246, 0.3)",
-                };
-            default:
-                return {
-                    background: "linear-gradient(135deg, rgba(168, 85, 247, 0.15), rgba(236, 72, 153, 0.15))",
-                    border: "1px solid rgba(168, 85, 247, 0.25)",
-                };
-        }
-    };
+      // Fetch AI Nudges if city changed or initial
+      if (weather.city !== prevCity) {
+        try {
+          const res = await fetch("/api/nudges", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              weather,
+              previousCity: prevCity,
+              timeContext: new Date().toLocaleTimeString(),
+            }),
+          });
+          const data = await res.json();
+          if (data.nudges) {
+            setAiNudges(data.nudges);
+          }
+          setPrevCity(weather.city);
+        } catch { /* ignore AI nudge failure */ }
+      }
+    } catch {
+      // Silently fail
+    }
+  }, []);
 
-    const getIcon = () => {
-        switch (alertType) {
-            case "uv":
-                return <Sun size={16} color="#ef4444" />;
-            case "humidity":
-                return <Droplets size={16} color="#3b82f6" />;
-            default:
-                return <Bell size={16} color="var(--accent-purple)" />;
-        }
-    };
+  useEffect(() => {
+    fetchAlerts();
+    const interval = setInterval(fetchAlerts, 30 * 60 * 1000); // 30 minutes
+    return () => clearInterval(interval);
+  }, [fetchAlerts]);
 
-    return (
+  const dismiss = (id: string) => {
+    setDismissed((prev) => new Set([...prev, id]));
+  };
+
+  const visibleAlerts = alerts.filter((a) => !dismissed.has(a.id));
+  const visibleNudges = aiNudges.filter((n) => !dismissed.has(n.id));
+  
+  if (visibleAlerts.length === 0 && visibleNudges.length === 0) return null;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "16px" }}>
+      {/* AI Nudges */}
+      {visibleNudges.map((nudge) => (
         <div
-            style={{
-                ...getBannerStyle(),
-                borderRadius: "12px",
-                padding: "12px 20px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                marginBottom: "16px",
-                animation: "slideUp 0.4s ease",
-            }}
-            data-testid="reminder-banner"
+          key={nudge.id}
+          style={{
+            background: "linear-gradient(90deg, rgba(167, 139, 250, 0.08), rgba(45, 212, 191, 0.08))",
+            border: "1px solid rgba(167, 139, 250, 0.2)",
+            borderRadius: "12px",
+            padding: "12px 16px",
+            display: "flex",
+            alignItems: "center",
+            gap: "12px",
+            fontSize: "0.85rem",
+            animation: "slideDown 0.5s ease",
+            position: "relative",
+            overflow: "hidden",
+          }}
         >
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "0.9rem" }}>
-                {getIcon()}
-                <span>{message}</span>
-                {weather && (
-                    <span style={{
-                        display: "flex", alignItems: "center", gap: "4px",
-                        background: "rgba(255,255,255,0.1)", padding: "2px 8px",
-                        borderRadius: "6px", fontSize: "0.75rem", color: "var(--text-muted)",
-                    }}>
-                        <MapPin size={12} /> {weather.city}
-                    </span>
-                )}
-            </div>
-            <button
-                onClick={() => setVisible(false)}
-                style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)" }}
-                data-testid="dismiss-reminder"
-            >
-                <X size={16} />
-            </button>
+          <div style={{
+            background: "var(--gradient-brand)",
+            borderRadius: "8px",
+            padding: "6px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}>
+            <Sparkles size={14} color="white" />
+          </div>
+          <div style={{ flex: 1 }}>
+            <span style={{ 
+              fontSize: "0.65rem", 
+              textTransform: "uppercase", 
+              letterSpacing: "1px", 
+              fontWeight: 700, 
+              color: "var(--accent-lavender)",
+              display: "block",
+              marginBottom: "2px"
+            }}>
+              AI Nudge {nudge.type === 'location' ? '• Traveler Mode' : ''}
+            </span>
+            <span style={{ fontWeight: 500 }}>{nudge.message}</span>
+          </div>
+          <button
+            onClick={() => dismiss(nudge.id)}
+            style={{
+              background: "none", border: "none", cursor: "pointer",
+              color: "var(--text-muted)", padding: "2px", flexShrink: 0,
+            }}
+          >
+            <X size={14} />
+          </button>
         </div>
-    );
+      ))}
+
+      {/* Weather Alerts */}
+      {visibleAlerts.map((alert) => (
+        <div
+          key={alert.id}
+          style={{
+            background: alert.severity === "high" ? "rgba(239, 68, 68, 0.08)" :
+                        alert.severity === "medium" ? "rgba(245, 158, 11, 0.08)" :
+                        "rgba(45, 212, 191, 0.06)",
+            border: `1px solid ${alert.severity === "high" ? "rgba(239, 68, 68, 0.2)" :
+                                  alert.severity === "medium" ? "rgba(245, 158, 11, 0.2)" :
+                                  "rgba(45, 212, 191, 0.15)"}`,
+            borderRadius: "12px",
+            padding: "10px 16px",
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+            fontSize: "0.85rem",
+            animation: "slideDown 0.4s ease",
+          }}
+        >
+          <span>{alert.emoji}</span>
+          <span style={{ flex: 1 }}>{alert.message}</span>
+          {city && (
+            <span style={{
+              display: "flex", alignItems: "center", gap: "4px",
+              background: "rgba(255,255,255,0.04)", padding: "2px 8px",
+              borderRadius: "6px", fontSize: "0.7rem", color: "var(--text-muted)",
+              whiteSpace: "nowrap",
+            }}>
+              <MapPin size={10} /> {city}
+            </span>
+          )}
+          <button
+            onClick={() => dismiss(alert.id)}
+            style={{
+              background: "none", border: "none", cursor: "pointer",
+              color: "var(--text-muted)", padding: "2px", flexShrink: 0,
+            }}
+          >
+            <X size={14} />
+          </button>
+        </div>
+      ))}
+    </div>
+  );
 }
