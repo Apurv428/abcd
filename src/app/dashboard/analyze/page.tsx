@@ -10,12 +10,54 @@ import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 
 interface AnalysisResult {
-  skinType: string;
   skinScore: number;
+  skinType: string;
+  fitzpatrickScale: number;
+  fitzpatrickDescription: string;
+  acne: {
+    present: boolean;
+    severity: string;
+    severityScore: number;
+    types: string[];
+    primaryZones: string[];
+  };
+  pigmentation: {
+    present: boolean;
+    type: string;
+    distribution: string;
+    severity: string;
+  };
+  texture: {
+    smoothnessScore: number;
+    poreVisibility: string;
+    issues: string[];
+  };
+  hydration: {
+    level: string;
+    score: number;
+    signs: string[];
+  };
+  oiliness: {
+    level: string;
+    zones: string[];
+  };
+  redness: {
+    present: boolean;
+    type: string;
+    severity: string;
+  };
+  aging: {
+    visibleAgeMarkers: string[];
+    perceivedSkinAge: number;
+  };
+  urgentFlag?: boolean;
+  urgentReason?: string | null;
   concerns: string[];
   summary: string;
   recommendations: string[];
-  urgentFlag?: boolean;
+  imageQuality: string;
+  imageQualityNote: string | null;
+  category?: string;
 }
 
 export default function AnalyzePage() {
@@ -165,8 +207,9 @@ function AnalyzeContent() {
 
   const getScoreColor = (score: number) => {
     if (score >= 80) return "#22c55e";
-    if (score >= 60) return "#eab308";
-    if (score >= 40) return "#f97316";
+    if (score >= 65) return "#2dd4bf";
+    if (score >= 50) return "#f59e0b";
+    if (score >= 35) return "#f97316";
     return "#ef4444";
   };
 
@@ -332,17 +375,10 @@ function AnalyzeContent() {
       {/* Results */}
       {result && (
         <div className="animate-slide-up" style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-          {/* Urgent Flag */}
-          {result.urgentFlag && (
-            <div style={{ background: "rgba(239, 68, 68, 0.1)", border: "1px solid rgba(239, 68, 68, 0.3)", borderRadius: "12px", padding: "14px 20px", display: "flex", alignItems: "center", gap: "10px" }}>
-              <AlertTriangle size={18} color="#ef4444" />
-              <span style={{ fontSize: "0.9rem" }}><strong>Professional Consult Recommended:</strong> Our AI detected concerns that may benefit from a dermatologist visit.</span>
-            </div>
-          )}
-
-          {/* Score Card with SVG Ring */}
+          
+          {/* SECTION A: Header Score Band */}
           <div className="glass-card-static" style={{ padding: "28px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "28px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "28px", flexWrap: "wrap" }}>
               <svg width="110" height="110" viewBox="0 0 110 110" style={{ flexShrink: 0 }}>
                 <circle cx="55" cy="55" r={radius} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="8" />
                 <circle
@@ -356,55 +392,301 @@ function AnalyzeContent() {
                 <text x="55" y="50" textAnchor="middle" fill={getScoreColor(result.skinScore)} fontSize="24" fontWeight="800">{result.skinScore}</text>
                 <text x="55" y="68" textAnchor="middle" fill="var(--text-muted)" fontSize="11">/ 100</text>
               </svg>
-              <div>
-                <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "4px" }}>
-                  {category === "hair" ? "Health Status" : "Skin Type"}
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "8px" }}>
+                  Overall Skin Score
                 </div>
-                {result.skinType !== "N/A" && (
-                  <div style={{ display: "inline-block", background: "rgba(45, 212, 191, 0.12)", color: "var(--accent-teal)", padding: "4px 14px", borderRadius: "8px", fontSize: "0.9rem", fontWeight: 700, textTransform: "capitalize", marginBottom: "10px" }}>
-                    {result.skinType}
-                  </div>
-                )}
-                <p style={{ color: "var(--text-secondary)", fontSize: "0.9rem", lineHeight: 1.6 }}>{result.summary}</p>
+                <p style={{ color: "var(--text-primary)", fontSize: "0.95rem", lineHeight: 1.6 }}>{result.summary}</p>
               </div>
             </div>
           </div>
 
-          {/* Concerns + Recommendations */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
-            <div className="glass-card-static" style={{ padding: "24px" }}>
-              <h3 style={{ fontWeight: 600, marginBottom: "14px", fontSize: "1rem" }}>🔍 Concerns Detected</h3>
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                {result.concerns.map((concern, i) => (
-                  <div key={i} style={{ background: "rgba(239, 68, 68, 0.08)", border: "1px solid rgba(239, 68, 68, 0.15)", borderRadius: "10px", padding: "10px 14px", fontSize: "0.85rem", textTransform: "capitalize" }}>
-                    {concern}
-                  </div>
-                ))}
+          {/* SECTION B: Urgent Flag Banner */}
+          {result.urgentFlag && (
+            <div style={{ 
+              background: "rgba(239, 68, 68, 0.1)", 
+              backdropFilter: "blur(20px)",
+              border: "1px solid rgba(239, 68, 68, 0.3)", 
+              borderRadius: "12px", 
+              padding: "16px 20px", 
+              display: "flex", 
+              alignItems: "flex-start", 
+              gap: "12px" 
+            }}>
+              <AlertTriangle size={20} color="#ef4444" style={{ flexShrink: 0, marginTop: "2px" }} />
+              <div>
+                <div style={{ fontSize: "0.95rem", fontWeight: 600, color: "#f87171", marginBottom: "4px" }}>
+                  Professional Consultation Recommended
+                </div>
+                <div style={{ fontSize: "0.85rem", color: "var(--text-secondary)", marginBottom: "8px" }}>
+                  {result.urgentReason}
+                </div>
+                <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", fontStyle: "italic" }}>
+                  This does not constitute medical advice. Please see a licensed dermatologist.
+                </div>
               </div>
             </div>
-            <div className="glass-card-static" style={{ padding: "24px" }}>
-              <h3 style={{ fontWeight: 600, marginBottom: "14px", fontSize: "1rem" }}>💡 Recommendations</h3>
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                {result.recommendations.map((rec, i) => (
-                  <div key={i} style={{ background: "rgba(34, 197, 94, 0.08)", border: "1px solid rgba(34, 197, 94, 0.15)", borderRadius: "10px", padding: "10px 14px", fontSize: "0.85rem" }}>
-                    {rec}
-                  </div>
-                ))}
-              </div>
+          )}
+
+          {/* SECTION C: Skin Profile Strip */}
+          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+            <div className="glass-card-static" style={{ padding: "10px 16px", display: "flex", alignItems: "center", gap: "8px" }}>
+              <span style={{ fontSize: "0.7rem", color: "var(--text-muted)", textTransform: "uppercase" }}>Skin</span>
+              <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--accent-teal)", textTransform: "capitalize" }}>{result.skinType}</span>
+            </div>
+            <div className="glass-card-static" style={{ padding: "10px 16px", display: "flex", alignItems: "center", gap: "8px" }}>
+              <span style={{ fontSize: "0.7rem", color: "var(--text-muted)", textTransform: "uppercase" }}>Fitzpatrick</span>
+              <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--accent-lavender)" }}>
+                Type {result.fitzpatrickScale} — {result.fitzpatrickDescription?.substring(0, 12) || ""}
+              </span>
+            </div>
+            <div className="glass-card-static" style={{ padding: "10px 16px", display: "flex", alignItems: "center", gap: "8px" }}>
+              <span style={{ fontSize: "0.7rem", color: "var(--text-muted)", textTransform: "uppercase" }}>Hydration</span>
+              <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "#60a5fa" }}>{result.hydration?.level?.replace(/_/g, " ") || "N/A"}</span>
+            </div>
+            <div className="glass-card-static" style={{ padding: "10px 16px", display: "flex", alignItems: "center", gap: "8px" }}>
+              <span style={{ fontSize: "0.7rem", color: "var(--text-muted)", textTransform: "uppercase" }}>Est. Age</span>
+              <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "#f472b6" }}>{result.aging?.perceivedSkinAge || "—"} yrs</span>
             </div>
           </div>
 
-          {/* Action Buttons */}
+          {/* SECTION D: Detailed Metrics Grid */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "16px" }}>
+            
+            {/* Card 1: Acne Analysis */}
+            <div className="glass-card-static" style={{ padding: "20px" }}>
+              <h4 style={{ fontSize: "0.8rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "12px" }}>Acne Analysis</h4>
+              <div style={{ marginBottom: "12px" }}>
+                <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginBottom: "6px" }}>IGA Severity Scale</div>
+                <div style={{ display: "flex", gap: "6px" }}>
+                  {[0,1,2,3,4].map(i => (
+                    <div key={i} style={{ 
+                      width: "20px", height: "20px", borderRadius: "50%", 
+                      background: i <= (result.acne?.severityScore || 0) ? "var(--accent-teal)" : "rgba(255,255,255,0.08)",
+                      border: "1px solid rgba(255,255,255,0.1)"
+                    }} />
+                  ))}
+                </div>
+              </div>
+              {result.acne?.present && (
+                <>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "8px" }}>
+                    {result.acne?.types?.map((t: string, i: number) => (
+                      <span key={i} style={{ fontSize: "0.7rem", padding: "3px 8px", background: "rgba(45,212,191,0.1)", borderRadius: "6px", color: "var(--accent-teal)" }}>{t}</span>
+                    ))}
+                  </div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                    {result.acne?.primaryZones?.map((z: string, i: number) => (
+                      <span key={i} style={{ fontSize: "0.65rem", padding: "2px 6px", background: "rgba(255,255,255,0.08)", borderRadius: "4px", border: "0.6px solid var(--glass-border)" }}>{z}</span>
+                    ))}
+                  </div>
+                </>
+              )}
+              {!result.acne?.present && <div style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>No significant acne detected</div>}
+            </div>
+
+            {/* Card 2: Pigmentation */}
+            <div className="glass-card-static" style={{ padding: "20px" }}>
+              <h4 style={{ fontSize: "0.8rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "12px" }}>Pigmentation</h4>
+              {result.pigmentation?.present ? (
+                <>
+                  <div style={{ display: "inline-block", background: "rgba(167, 139, 250, 0.15)", padding: "4px 12px", borderRadius: "8px", marginBottom: "10px" }}>
+                    <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--accent-lavender)" }}>
+                      {result.pigmentation?.type === "PIH" ? "PIH — Post-Inflammatory Hyperpigmentation" :
+                       result.pigmentation?.type === "PIE" ? "PIE — Post-Inflammatory Erythema" :
+                       result.pigmentation?.type === "melasma" ? "Melasma" :
+                       result.pigmentation?.type === "sun_spots" ? "Sun Spots / Solar Lentigines" :
+                       result.pigmentation?.type === "freckles" ? "Ephelides (Freckles)" :
+                       result.pigmentation?.type === "mixed" ? "Mixed Hyperpigmentation" :
+                       result.pigmentation?.type || "Unknown"}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>
+                    {result.pigmentation?.distribution} • {result.pigmentation?.severity}
+                  </div>
+                </>
+              ) : (
+                <div style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>No Significant Pigmentation</div>
+              )}
+            </div>
+
+            {/* Card 3: Skin Texture */}
+            <div className="glass-card-static" style={{ padding: "20px" }}>
+              <h4 style={{ fontSize: "0.8rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "12px" }}>Skin Texture</h4>
+              <div style={{ marginBottom: "12px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
+                  <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>Smoothness</span>
+                  <span style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--accent-teal)" }}>{result.texture?.smoothnessScore || 0}/100</span>
+                </div>
+                <div style={{ height: "4px", background: "rgba(255,255,255,0.08)", borderRadius: "2px", overflow: "hidden" }}>
+                  <div style={{ width: `${result.texture?.smoothnessScore || 0}%`, height: "100%", background: "var(--accent-teal)", borderRadius: "2px", transition: "width 0.5s ease" }} />
+                </div>
+              </div>
+              <div style={{ marginBottom: "8px" }}>
+                <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginRight: "6px" }}>Pores:</span>
+                <span style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--text-primary)" }}>{result.texture?.poreVisibility?.replace(/_/g, " ") || "N/A"}</span>
+              </div>
+              {result.texture?.issues?.length > 0 && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
+                  {result.texture?.issues?.map((issue: string, i: number) => (
+                    <span key={i} style={{ fontSize: "0.65rem", padding: "2px 6px", background: "rgba(255,255,255,0.08)", borderRadius: "4px", border: "0.6px solid var(--glass-border)" }}>{issue.replace(/_/g, " ")}</span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Card 4: Hydration & Oiliness */}
+            <div className="glass-card-static" style={{ padding: "20px" }}>
+              <h4 style={{ fontSize: "0.8rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "12px" }}>Hydration & Oiliness</h4>
+              <div style={{ marginBottom: "12px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
+                  <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>Hydration</span>
+                  <span style={{ fontSize: "0.8rem", fontWeight: 600, color: "#60a5fa" }}>{result.hydration?.score || 0}/100</span>
+                </div>
+                <div style={{ height: "4px", background: "rgba(255,255,255,0.08)", borderRadius: "2px", overflow: "hidden" }}>
+                  <div style={{ width: `${result.hydration?.score || 0}%`, height: "100%", background: "#60a5fa", borderRadius: "2px", transition: "width 0.5s ease" }} />
+                </div>
+              </div>
+              <div style={{ marginBottom: "8px" }}>
+                <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginRight: "6px" }}>Oiliness:</span>
+                <span style={{ 
+                  fontSize: "0.8rem", fontWeight: 600, 
+                  color: (result.oiliness?.level === "none" || result.oiliness?.level === "low") ? "#22c55e" : 
+                         result.oiliness?.level === "moderate" ? "#eab308" : "#ef4444" 
+                }}>{result.oiliness?.level?.replace(/_/g, " ") || "N/A"}</span>
+              </div>
+              {result.oiliness?.zones?.length > 0 && result.oiliness?.zones?.[0] !== "none" && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
+                  {result.oiliness?.zones?.map((z: string, i: number) => (
+                    <span key={i} style={{ fontSize: "0.65rem", padding: "2px 6px", background: "rgba(255,255,255,0.08)", borderRadius: "4px", border: "0.6px solid var(--glass-border)" }}>{z}</span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Card 5: Redness & Inflammation */}
+            <div className="glass-card-static" style={{ padding: "20px" }}>
+              <h4 style={{ fontSize: "0.8rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "12px" }}>Redness & Inflammation</h4>
+              {result.redness?.present ? (
+                <>
+                  <div style={{ display: "inline-block", background: "rgba(248, 113, 113, 0.15)", padding: "4px 12px", borderRadius: "8px", marginBottom: "8px" }}>
+                    <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "#f87171" }}>
+                      {result.redness?.type === "rosacea_suspect" ? "Rosacea Suspect" :
+                       result.redness?.type === "general_inflammation" ? "General Inflammation" :
+                       result.redness?.type === "post_acne" ? "Post-Acne" :
+                       result.redness?.type === "irritation" ? "Irritation" : "Redness"}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>{result.redness?.severity}</div>
+                </>
+              ) : (
+                <div style={{ fontSize: "0.8rem", color: "#22c55e" }}>No significant redness detected</div>
+              )}
+            </div>
+
+            {/* Card 6: Skin Aging */}
+            <div className="glass-card-static" style={{ padding: "20px" }}>
+              <h4 style={{ fontSize: "0.8rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "12px" }}>Skin Aging</h4>
+              <div style={{ marginBottom: "8px" }}>
+                <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginRight: "6px" }}>Estimated:</span>
+                <span style={{ fontSize: "0.9rem", fontWeight: 600, color: "#f472b6" }}>{result.aging?.perceivedSkinAge || "—"} years</span>
+              </div>
+              {result.aging?.visibleAgeMarkers?.length > 0 && result.aging?.visibleAgeMarkers?.[0] !== "none" ? (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
+                  {result.aging?.visibleAgeMarkers?.map((m: string, i: number) => (
+                    <span key={i} style={{ fontSize: "0.65rem", padding: "2px 6px", background: "rgba(244, 114, 182, 0.15)", borderRadius: "4px", color: "#f472b6" }}>{m.replace(/_/g, " ")}</span>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>No significant aging markers detected</div>
+              )}
+            </div>
+          </div>
+
+          {/* SECTION E: Concerns List */}
+          <div className="glass-card-static" style={{ padding: "24px" }}>
+            <h3 style={{ fontWeight: 600, marginBottom: "16px", fontSize: "1rem", display: "flex", alignItems: "center", gap: "8px" }}>
+              🔬 Clinical Findings
+            </h3>
+            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+              {result.concerns?.map((concern: string, i: number) => (
+                <div key={i} style={{ 
+                  background: "rgba(239, 68, 68, 0.08)", 
+                  border: "1px solid rgba(239, 68, 68, 0.15)", 
+                  borderRadius: "10px", 
+                  padding: "12px 16px", 
+                  fontSize: "0.9rem",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px"
+                }}>
+                  <AlertTriangle size={16} color="#ef4444" />
+                  {concern}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* SECTION F: Recommendations List */}
+          <div className="glass-card-static" style={{ padding: "24px" }}>
+            <h3 style={{ fontWeight: 600, marginBottom: "16px", fontSize: "1rem", display: "flex", alignItems: "center", gap: "8px" }}>
+              🍃 Treatment Recommendations
+            </h3>
+            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+              {result.recommendations?.map((rec: string, i: number) => (
+                <div key={i} style={{ 
+                  background: "rgba(34, 197, 94, 0.08)", 
+                  border: "1px solid rgba(34, 197, 94, 0.15)", 
+                  borderRadius: "10px", 
+                  padding: "12px 16px", 
+                  fontSize: "0.9rem",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px"
+                }}>
+                  <div style={{ 
+                    width: "20px", height: "20px", borderRadius: "50%", 
+                    background: "rgba(34, 197, 94, 0.2)", 
+                    display: "flex", alignItems: "center", justifyContent: "center" 
+                  }}>
+                    <span style={{ fontSize: "0.7rem", color: "#22c55e" }}>✓</span>
+                  </div>
+                  {rec}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* SECTION G: Image Quality Note */}
+          {result.imageQuality !== "good" && result.imageQualityNote && (
+            <div style={{ 
+              background: "rgba(234, 179, 8, 0.1)", 
+              border: "1px solid rgba(234, 179, 8, 0.2)", 
+              borderRadius: "12px", 
+              padding: "14px 18px", 
+              display: "flex", 
+              alignItems: "center", 
+              gap: "10px" 
+            }}>
+              <span style={{ fontSize: "1.1rem" }}>📷</span>
+              <span style={{ fontSize: "0.85rem", color: "#fbbf24" }}>{result.imageQualityNote}</span>
+            </div>
+          )}
+
+          {/* SECTION H: Action Buttons Row */}
           <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
             <Link href="/dashboard/products" className="glass-button" style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: "8px" }}>
-              <ShoppingBag size={16} /> View Recommended Products
+              <ShoppingBag size={16} /> View Matched Products
+            </Link>
+            <Link href="/dashboard/routine" className="glass-button-secondary" style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: "8px" }}>
+              Generate Routine
+            </Link>
+            <Link href={`/dashboard/journal?score=${result.skinScore}`} className="glass-button-secondary" style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: "8px" }}>
+              <BookOpen size={16} /> Save to Journal
             </Link>
             <button className="glass-button-secondary" onClick={resetFlow} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               <Sparkles size={16} /> Analyze Another Photo
             </button>
-            <Link href={`/dashboard/journal?score=${result.skinScore}`} className="glass-button-secondary" style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: "8px" }}>
-              <BookOpen size={16} /> Save to Journal
-            </Link>
           </div>
         </div>
       )}

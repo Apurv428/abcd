@@ -132,68 +132,64 @@ export async function POST(request: NextRequest) {
         const base64Data = imageData.replace(/^data:image\/\w+;base64,/, "");
         const mimeType = imageData.match(/^data:(image\/\w+);/)?.[1] || "image/jpeg";
 
-        let prompt = `You are a clinical dermatologist AI. Analyze this photograph. Return ONLY valid JSON with NO markdown, no backticks, no explanation.`;
+        let prompt = DERMATOLOGY_PROMPT;
         
         if (category === "hair") {
-          prompt += `
-CATEGORY: Hair & Beard
-Analyze for: hair density, scalp health, patches (alopecia/beard patches), follicle strength, and thinning patterns.
-JSON response structure:
+          prompt = `You are a clinical dermatologist AI. Analyze this hair/beard photograph. Return ONLY valid JSON with no markdown, no explanation.
 {
   "skinType": "N/A",
-  "skinScore": integer 0-100 (Hair/Beard health score),
-  "concerns": string[] (2-4 hair/scalp specific concerns),
-  "recommendations": string[] (3-5 actionable hair/beard care steps),
-  "summary": string (2-3 sentence clinical summary of hair health),
+  "skinScore": integer 0-100,
+  "concerns": string array,
+  "recommendations": string array,
+  "summary": string,
   "urgentFlag": boolean
 }`;
         } else if (category === "body") {
-          prompt += `
-CATEGORY: Body Skin
-Analyze for: dark patches, dryness, irritation, texture, lesions, or moles on limbs/torso.
-JSON response structure:
+          prompt = `You are a clinical dermatologist AI. Analyze this body skin photograph. Return ONLY valid JSON with no markdown, no explanation.
 {
   "skinType": "dry"|"normal"|"irritated"|"sun-damaged",
-  "skinScore": integer 0-100 (Area health score),
-  "concerns": string[] (2-4 specific skin concerns detected),
-  "recommendations": string[] (3-5 actionable body skincare steps),
-  "summary": string (2-3 sentence clinical summary of the area),
-  "urgentFlag": boolean
-}`;
-        } else {
-          prompt += `
-CATEGORY: Facial Skin
-Analyze for: type, texture, scores, acne, aging, and hydration.
-JSON response structure:
-{
-  "skinType": "oily"|"dry"|"combination"|"normal"|"sensitive",
   "skinScore": integer 0-100,
-  "concerns": string[] (2-5 concerns),
-  "recommendations": string[] (4-6 steps),
-  "summary": string (2-3 sentences),
+  "concerns": string array,
+  "recommendations": string array,
+  "summary": string,
   "urgentFlag": boolean
 }`;
         }
 
-        const result = await model.generateContent([
-          { text: prompt },
-          { inlineData: { mimeType, data: base64Data } },
-        ]);
+        let result;
+        try {
+          result = await model.generateContent([
+            { text: prompt },
+            { inlineData: { mimeType, data: base64Data } },
+          ]);
 
-        const responseText = result.response.text();
-        const cleaned = responseText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-        analysis = JSON.parse(cleaned);
+          const responseText = result.response.text();
+          const cleaned = responseText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+          analysis = JSON.parse(cleaned);
+        } catch (parseErr) {
+          console.error("First parse failed, retrying with simplified prompt:", parseErr instanceof Error ? parseErr.message : "");
+          const retryResult = await model.generateContent([
+            { text: SIMPLIFIED_PROMPT },
+            { inlineData: { mimeType, data: base64Data } },
+          ]);
+          const retryText = retryResult.response.text();
+          const retryCleaned = retryText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+          analysis = JSON.parse(retryCleaned);
+        }
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : "";
         if (message.includes("429") || message.includes("quota")) {
           analysis = getMockAnalysis("Rate limit reached — showing sample results", category);
+          (analysis as any).mock = true;
         } else {
           console.error("Gemini error:", message);
           analysis = getMockAnalysis("AI temporarily unavailable — showing sample results", category);
+          (analysis as any).mock = true;
         }
       }
     } else {
       analysis = getMockAnalysis("Demo mode — no API key configured", category);
+      (analysis as any).mock = true;
     }
 
     // 4. Upload to Supabase Storage if AI succeeded
@@ -264,34 +260,77 @@ function getMockAnalysis(note: string, category: string) {
     return {
       skinType: "N/A",
       skinScore: 68,
+      fitzpatrickScale: 3,
+      fitzpatrickDescription: "Type III: Medium, sometimes burns",
+      acne: { present: false, severity: "none", severityScore: 0, types: [], primaryZones: [] },
+      pigmentation: { present: false, type: "none", distribution: "none", severity: "none" },
+      texture: { smoothnessScore: 75, poreVisibility: "moderate", issues: [] },
+      hydration: { level: "normal", score: 70, signs: ["none"] },
+      oiliness: { level: "moderate", zones: ["T-zone"] },
+      redness: { present: false, type: "none", severity: "none" },
+      aging: { visibleAgeMarkers: [], perceivedSkinAge: 30 },
       concerns: ["Thinning at temples", "Dry scalp patches"],
-      recommendations: ["Use a caffeine-infused scalp serum", "Switch to a sulfate-free strengthening shampoo", "Minimize heat styling"],
+      recommendations: ["Use a caffeine-infused scalp serum", "Switch to a sulfate-free strengthening shampoo", "Minimize heat styling", "Consider topical minoxidil", "Massage scalp daily to stimulate circulation"],
       summary: `${note}. Your hair shows early signs of thinning at the temples with some scalp dryness. Overall hair health is fair.`,
       urgentFlag: false,
+      urgentReason: null,
+      imageQuality: "good",
+      imageQualityNote: null,
     };
   }
   if (category === "body") {
     return {
       skinType: "dry",
       skinScore: 62,
+      fitzpatrickScale: 3,
+      fitzpatrickDescription: "Type III: Medium, sometimes burns",
+      acne: { present: false, severity: "none", severityScore: 0, types: [], primaryZones: [] },
+      pigmentation: { present: true, type: "sun_spots", distribution: "localized", severity: "mild" },
+      texture: { smoothnessScore: 55, poreVisibility: "minimal", issues: ["rough_texture", "flaking"] },
+      hydration: { level: "dehydrated", score: 35, signs: ["tight_feeling", "flaking"] },
+      oiliness: { level: "none", zones: ["none"] },
+      redness: { present: false, type: "none", severity: "none" },
+      aging: { visibleAgeMarkers: ["age_spots"], perceivedSkinAge: 42 },
       concerns: ["Dry patches on elbows", "Mild hyperpigmentation on forearms"],
-      recommendations: ["Apply urea-based cream twice daily", "Use a chemical exfoliant (AHA) once a week", "Always wear SPF on exposed limbs"],
+      recommendations: ["Apply urea-based cream twice daily", "Use a chemical exfoliant (AHA) once a week", "Always wear SPF on exposed limbs", "Use a rich body butter after showering", "Consider a humidifier for bedroom"],
       summary: `${note}. The area shows significant dryness and some uneven tone. Regular hydration and targeted exfoliation will help.`,
       urgentFlag: false,
+      urgentReason: null,
+      imageQuality: "good",
+      imageQualityNote: null,
     };
   }
   return {
     skinType: "combination",
     skinScore: 72,
-    concerns: ["Mild dehydration around cheeks", "Minor texture irregularities on forehead", "Slight oil overproduction in T-zone"],
+    fitzpatrickScale: 3,
+    fitzpatrickDescription: "Type III: Medium, sometimes burns",
+    acne: { present: true, severity: "mild", severityScore: 1, types: ["whiteheads"], primaryZones: ["forehead", "nose"] },
+    pigmentation: { present: true, type: "PIH", distribution: "localized", severity: "mild" },
+    texture: { smoothnessScore: 78, poreVisibility: "moderate", issues: ["large_pores"] },
+    hydration: { level: "dehydrated", score: 45, signs: ["tight_feeling", "fine_dehydration_lines"] },
+    oiliness: { level: "moderate", zones: ["T-zone", "nose"] },
+    redness: { present: true, type: "post_acne", severity: "mild" },
+    aging: { visibleAgeMarkers: ["fine_lines"], perceivedSkinAge: 28 },
+    concerns: [
+      "Mild dehydration around cheeks",
+      "Minor texture irregularities on forehead",
+      "Slight oil overproduction in T-zone",
+      "Post-acne marks on chin",
+    ],
     recommendations: [
       "Use a gentle hydrating cleanser twice daily",
       "Apply hyaluronic acid serum on damp skin",
       "Use SPF 30+ broad-spectrum sunscreen every morning",
       "Add niacinamide serum to address oil balance and texture",
       "Consider a weekly hydrating sheet mask",
+      "Use a lightweight gel moisturizer for T-zone",
+      "Incorporate a gentle BHA exfoliant 2x per week",
     ],
     summary: `${note}. Your skin shows a combination pattern with mild dehydration and slight oiliness in the T-zone. Overall skin health is good with minor areas for improvement.`,
     urgentFlag: false,
+    urgentReason: null,
+    imageQuality: "good",
+    imageQualityNote: null,
   };
 }

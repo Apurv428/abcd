@@ -22,6 +22,105 @@ interface AnalysisRecord {
     concerns: string[];
     recommendations: string[];
     category?: string;
+    acne?: { severity?: string };
+  };
+}
+
+function SimpleLineChart({ data }: { data: { date: string; score: number; acne: string }[] }) {
+  const maxScore = 100;
+  const minScore = 0;
+  const range = maxScore - minScore;
+  
+  const width = 600;
+  const height = 200;
+  const padding = 40;
+  
+  const points = data.map((d, i) => {
+    const x = padding + (i / (data.length - 1 || 1)) * (width - 2 * padding);
+    const y = height - padding - ((d.score - minScore) / range) * (height - 2 * padding);
+    return { x, y, ...d };
+  });
+
+  const pathD = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+
+  return (
+    <div style={{ overflowX: "auto", padding: "10px 0" }}>
+      <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ display: "block", margin: "0 auto" }}>
+        {/* Grid lines */}
+        {[0, 25, 50, 75, 100].map((tick) => (
+          <g key={tick}>
+            <line 
+              x1={padding} 
+              y1={height - padding - ((tick - minScore) / range) * (height - 2 * padding)} 
+              x2={width - padding} 
+              y2={height - padding - ((tick - minScore) / range) * (height - 2 * padding)} 
+              stroke="rgba(255,255,255,0.06)" 
+              strokeWidth="1" 
+            />
+            <text 
+              x={padding - 10} 
+              y={height - padding - ((tick - minScore) / range) * (height - 2 * padding) + 4} 
+              fill="#4a5568" 
+              fontSize="10" 
+              textAnchor="end"
+            >
+              {tick}
+            </text>
+          </g>
+        ))}
+        
+        {/* Line */}
+        <path 
+          d={pathD} 
+          fill="none" 
+          stroke="#2dd4bf" 
+          strokeWidth="2.5" 
+          strokeLinecap="round" 
+          strokeLinejoin="round"
+        />
+        
+        {/* Dots */}
+        {points.map((p, i) => (
+          <g key={i}>
+            <circle 
+              cx={p.x} 
+              cy={p.y} 
+              r="6" 
+              fill="#0a0a1e" 
+              stroke="#2dd4bf" 
+              strokeWidth="2"
+            />
+          </g>
+        ))}
+      </svg>
+      
+      {/* Custom tooltip would need more complex setup - showing simple labels below */}
+      <div style={{ display: "flex", justifyContent: "space-between", padding: "0 40px", marginTop: "8px" }}>
+        {data.slice(0, Math.min(data.length, 5)).map((d, i) => (
+          <div key={i} style={{ fontSize: "0.65rem", color: "var(--text-muted)", textAlign: "center" }}>
+            {d.date}
+            <br />
+            <span style={{ color: "#2dd4bf", fontWeight: 600 }}>{d.score}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+interface AnalysisRecord {
+  id: string;
+  created_at: string;
+  image_url: string | null;
+  skin_score: number;
+  urgent_flag: boolean;
+  analysis_json: {
+    skinType: string;
+    summary: string;
+    concerns: string[];
+    recommendations: string[];
+    category?: string;
+    acne?: { severity?: string };
   };
 }
 
@@ -80,9 +179,29 @@ export default function AnalysisHistoryPage() {
 
   const getScoreColor = (score: number) => {
     if (score >= 80) return "#22c55e";
-    if (score >= 60) return "#eab308";
+    if (score >= 65) return "#2dd4bf";
+    if (score >= 50) return "#f59e0b";
+    if (score >= 35) return "#f97316";
     return "#ef4444";
   };
+
+  const getSeverityColor = (severity: string | undefined) => {
+    if (!severity || severity === "none") return "#22c55e";
+    if (severity === "mild") return "#2dd4bf";
+    if (severity === "moderate") return "#eab308";
+    if (severity === "severe" || severity === "very_severe") return "#ef4444";
+    return "#a78bfa";
+  };
+
+  const chartData = records
+    .slice()
+    .reverse()
+    .slice(-10)
+    .map(r => ({
+      date: format(new Date(r.created_at), "MMM d"),
+      score: r.skin_score,
+      acne: r.analysis_json?.acne?.severity || "none"
+    }));
 
   return (
     <div className="animate-fade-in">
@@ -92,6 +211,15 @@ export default function AnalysisHistoryPage() {
           <p style={{ color: "var(--text-secondary)", fontSize: "0.9rem" }}>Track your skin, hair, and body health journey</p>
         </div>
       </div>
+
+      {chartData.length > 1 && (
+        <div className="glass-card-static" style={{ padding: "24px", marginBottom: "24px" }}>
+          <h3 style={{ fontSize: "0.9rem", fontWeight: 600, marginBottom: "16px", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "1px" }}>
+            Skin Score Over Time
+          </h3>
+          <SimpleLineChart data={chartData} />
+        </div>
+      )}
 
       <div style={{ display: "flex", gap: "12px", marginBottom: "24px", flexWrap: "wrap" }}>
         <div style={{ flex: 1, minWidth: "200px", position: "relative" }}>
@@ -159,18 +287,30 @@ export default function AnalysisHistoryPage() {
                 )}
               </div>
               
-              <div style={{ padding: "16px", flex: 1 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "10px" }}>
+                <div style={{ padding: "16px", flex: 1 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "10px", flexWrap: "wrap", gap: "8px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "6px", color: "var(--text-muted)", fontSize: "0.75rem" }}>
                     <Calendar size={12} />
                     {format(new Date(record.created_at), "MMM d, yyyy")}
                   </div>
-                  <div style={{ 
-                    fontSize: "0.65rem", textTransform: "uppercase", letterSpacing: "1px", 
-                    color: "var(--accent-teal)", fontWeight: 700, background: "rgba(45, 212, 191, 0.1)",
-                    padding: "2px 8px", borderRadius: "4px"
-                  }}>
-                    {record.analysis_json.category || "Face"}
+                  <div style={{ display: "flex", gap: "6px" }}>
+                    {record.analysis_json?.acne?.severity && record.analysis_json.acne.severity !== "none" && (
+                      <span style={{ 
+                        fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.5px", 
+                        color: getSeverityColor(record.analysis_json.acne.severity), 
+                        background: `${getSeverityColor(record.analysis_json.acne.severity)}20`,
+                        padding: "2px 6px", borderRadius: "4px", border: `0.6px solid ${getSeverityColor(record.analysis_json.acne.severity)}40`
+                      }}>
+                        {record.analysis_json.acne.severity}
+                      </span>
+                    )}
+                    <span style={{ 
+                      fontSize: "0.65rem", textTransform: "uppercase", letterSpacing: "1px", 
+                      color: "var(--accent-teal)", fontWeight: 700, background: "rgba(45, 212, 191, 0.1)",
+                      padding: "2px 8px", borderRadius: "4px"
+                    }}>
+                      {record.analysis_json.category || "Face"}
+                    </span>
                   </div>
                 </div>
                 

@@ -32,6 +32,28 @@ export async function POST(request: NextRequest) {
     const concerns = profile?.concerns || ["general skincare"];
     const profileCity = profile?.city || "";
 
+    // Get latest skin analysis
+    const { data: latestAnalysis } = await supabase
+      .from("skin_analyses")
+      .select("analysis_json")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single();
+    
+    const analysisJson = latestAnalysis?.analysis_json;
+    const analysisFindings = analysisJson ? `
+Latest skin analysis findings:
+- Skin type: ${analysisJson.skinType || "N/A"}
+- Acne: ${analysisJson.acne?.severity || "none"} ${analysisJson.acne?.types?.length ? `(${analysisJson.acne.types.join(", ")})` : ""}
+- Pigmentation: ${analysisJson.pigmentation?.type || "none"}
+- Hydration: ${analysisJson.hydration?.level || "normal"}
+- Oiliness: ${analysisJson.oiliness?.level || "normal"} ${analysisJson.oiliness?.zones?.length ? `in ${analysisJson.oiliness.zones.join(", ")}` : ""}
+- Redness: ${analysisJson.redness?.type || "none"}
+- Key concerns: ${analysisJson.concerns?.join("; ") || "none"}
+
+IMPORTANT: Tailor every step to these specific findings. If acne is moderate or severe, include a targeted acne treatment step. If PIH is present, include a Vitamin C or niacinamide step. If severely dehydrated, include a hydrating essence step. If oiliness is high, recommend gel-based products only.` : "";
+
     // Get weather
     let weather;
     if (lat && lon) {
@@ -67,6 +89,7 @@ Patient profile:
 - UV Index: ${weather.uvIndex}
 - Conditions: ${weather.description}
 ${conditionalInstructions}
+${analysisFindings}
 
 Return ONLY valid JSON with no markdown:
 {

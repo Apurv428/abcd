@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase";
 import { getProductRecommendations, type Product } from "@/lib/products";
-import { ExternalLink, Star, ShoppingBag } from "lucide-react";
+import { ExternalLink, Star, ShoppingBag, Package, Plus, Check } from "lucide-react";
 
 const CATEGORIES = ["All", "Cleanser", "Toner", "Serum", "Moisturizer", "Sunscreen", "Exfoliant", "Eye Cream", "Mask"];
 
@@ -12,6 +12,8 @@ export default function ProductsPage() {
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState("All");
   const [userSkinType, setUserSkinType] = useState("");
+  const [shelfProductNames, setShelfProductNames] = useState<string[]>([]);
+  const [addingId, setAddingId] = useState<string | null>(null);
   const supabase = createClient();
 
   useEffect(() => {
@@ -19,17 +21,20 @@ export default function ProductsPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data: analysis } = await supabase
-        .from("skin_analyses").select("analysis_json")
-        .eq("user_id", user.id).order("created_at", { ascending: false }).limit(1).single();
+      const [analysisRes, profileRes, shelfRes] = await Promise.all([
+        supabase.from("skin_analyses").select("analysis_json").eq("user_id", user.id).order("created_at", { ascending: false }).limit(1).single(),
+        supabase.from("profiles").select("skin_type, concerns").eq("id", user.id).single(),
+        supabase.from("shelf_products").select("name").eq("user_id", user.id),
+      ]);
 
-      const { data: profile } = await supabase
-        .from("profiles").select("skin_type, concerns")
-        .eq("id", user.id).single();
+      const { data: analysis } = analysisRes;
+      const { data: profile } = profileRes;
+      const shelfNames = shelfRes.data?.map(s => s.name) || [];
 
       const skinType = analysis?.analysis_json?.skinType || profile?.skin_type || "combination";
       const concerns = analysis?.analysis_json?.concerns || profile?.concerns || ["general care"];
       setUserSkinType(skinType);
+      setShelfProductNames(shelfNames);
 
       const recs = getProductRecommendations(skinType, concerns, 20);
       setProducts(recs);
@@ -37,6 +42,26 @@ export default function ProductsPage() {
     }
     load();
   }, []);
+
+  const handleAddToShelf = async (product: Product) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    setAddingId(product.id);
+    try {
+      await supabase.from("shelf_products").insert({
+        user_id: user.id,
+        name: product.name,
+        brand: product.brand,
+        category: product.category,
+      });
+      setShelfProductNames(prev => [...prev, product.name]);
+    } catch (err) {
+      console.error("Failed to add to shelf:", err);
+    } finally {
+      setAddingId(null);
+    }
+  };
 
   const filtered = activeCategory === "All" ? products : products.filter(p => p.category === activeCategory);
 
@@ -148,7 +173,29 @@ export default function ProductsPage() {
               {/* Price + Buy Buttons */}
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" }}>
                 <span style={{ fontWeight: 700, fontSize: "1.05rem" }}>${product.price.toFixed(2)}</span>
-                <div style={{ display: "flex", gap: "6px" }}>
+                <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                  <button
+                    onClick={() => handleAddToShelf(product)}
+                    disabled={shelfProductNames.includes(product.name) || addingId === product.id}
+                    title={shelfProductNames.includes(product.name) ? "Already in shelf" : "Add to shelf"}
+                    style={{
+                      width: "32px", height: "32px", borderRadius: "8px",
+                      border: `1px solid ${shelfProductNames.includes(product.name) ? "var(--accent-teal)" : "var(--glass-border)"}`,
+                      background: shelfProductNames.includes(product.name) ? "rgba(45,212,191,0.15)" : "var(--glass-bg)",
+                      color: shelfProductNames.includes(product.name) ? "var(--accent-teal)" : "var(--text-secondary)",
+                      cursor: shelfProductNames.includes(product.name) ? "default" : "pointer",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      transition: "all 0.2s", flexShrink: 0,
+                    }}
+                  >
+                    {addingId === product.id ? (
+                      <div style={{ width: "14px", height: "14px", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "var(--accent-teal)", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+                    ) : shelfProductNames.includes(product.name) ? (
+                      <Check size={14} />
+                    ) : (
+                      <Package size={14} />
+                    )}
+                  </button>
                   {product.affiliateUrls.amazon && (
                     <a href={product.affiliateUrls.amazon} target="_blank" rel="noopener noreferrer" className="glass-button" style={{ padding: "6px 12px", fontSize: "0.75rem", textDecoration: "none", display: "flex", alignItems: "center", gap: "4px" }}>
                       Amazon <ExternalLink size={11} />

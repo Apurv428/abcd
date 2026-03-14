@@ -157,6 +157,13 @@ create policy "Users can update own shelf products" on public.shelf_products
 create policy "Users can delete own shelf products" on public.shelf_products
   for delete using (auth.uid() = user_id);
 
+-- 7. Indexes for skin_analyses performance
+create index if not exists idx_skin_analyses_score 
+on skin_analyses(user_id, skin_score desc, created_at desc);
+
+create index if not exists idx_skin_analyses_urgent 
+on skin_analyses(user_id, urgent_flag) where urgent_flag = true;
+
 -- ============================================================
 -- MIGRATION: If tables already exist, run these ALTER statements
 -- ============================================================
