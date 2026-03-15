@@ -4,6 +4,9 @@ import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase";
 import { getProductRecommendations, type Product } from "@/lib/products";
 import { ExternalLink, Star, ShoppingBag, Package, Plus, Check } from "lucide-react";
+import dynamic from "next/dynamic";
+
+const ProductPricePanel = dynamic(() => import("@/components/ProductPricePanel"), { ssr: false });
 
 const CATEGORIES = ["All", "Cleanser", "Toner", "Serum", "Moisturizer", "Sunscreen", "Exfoliant", "Eye Cream", "Mask"];
 
@@ -109,6 +112,24 @@ export default function ProductsPage() {
         </p>
       </div>
 
+      {/* India Price Banner */}
+      <div style={{
+        marginBottom: "16px",
+        padding: "10px 14px",
+        background: "rgba(255,255,255,0.03)",
+        border: "1px solid rgba(255,255,255,0.06)",
+        borderRadius: "8px",
+        fontSize: "0.8rem",
+        color: "var(--text-secondary)",
+        display: "flex",
+        alignItems: "center",
+        gap: "8px",
+      }}>
+        <span>🇮🇳</span>
+        <span>Live prices from <strong style={{color:'#f0f4ff'}}>Nykaa · Purplle · Tira Beauty</strong></span>
+        <span style={{ color: "var(--text-muted)", fontSize: "0.75rem" }}>• Prices updated every 12 hours</span>
+      </div>
+
       {/* Category Filter */}
       <div style={{ display: "flex", gap: "8px", marginBottom: "20px", flexWrap: "wrap" }}>
         {CATEGORIES.map((cat) => (
@@ -196,16 +217,7 @@ export default function ProductsPage() {
                       <Package size={14} />
                     )}
                   </button>
-                  {product.affiliateUrls.amazon && (
-                    <a href={product.affiliateUrls.amazon} target="_blank" rel="noopener noreferrer" className="glass-button" style={{ padding: "6px 12px", fontSize: "0.75rem", textDecoration: "none", display: "flex", alignItems: "center", gap: "4px" }}>
-                      Amazon <ExternalLink size={11} />
-                    </a>
-                  )}
-                  {product.affiliateUrls.sephora && (
-                    <a href={product.affiliateUrls.sephora} target="_blank" rel="noopener noreferrer" className="glass-button-secondary" style={{ padding: "6px 12px", fontSize: "0.75rem", textDecoration: "none", display: "flex", alignItems: "center", gap: "4px", borderColor: "var(--accent-lavender)", color: "var(--accent-lavender)" }}>
-                      Sephora <ExternalLink size={11} />
-                    </a>
-                  )}
+                  <ProductPricePanel productName={product.name} brand={product.brand} />
                 </div>
               </div>
             </div>

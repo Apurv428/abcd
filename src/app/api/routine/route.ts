@@ -24,13 +24,32 @@ export async function POST(request: NextRequest) {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const body = await request.json().catch(() => ({}));
-    const { lat, lon } = body;
+    const { lat, lon, city } = body;
 
-    // Get user profile
+    // Get user profile for skin data
     const { data: profile } = await supabase.from("profiles").select("skin_type, concerns, city, sensitivity_level").eq("id", user.id).single();
     const skinType = profile?.skin_type || "combination";
     const concerns = profile?.concerns || ["general skincare"];
     const profileCity = profile?.city || "";
+
+    console.log("[Routine API] Received:", { lat, lon, city, hasCoords: !!(lat && lon), hasCity: !!city, profileCity });
+
+    // Get weather - Priority: coords > city from body > profile city
+    let weather;
+    if (lat !== undefined && lon !== undefined) {
+      console.log("[Routine API] Using coordinates:", lat, lon);
+      weather = await getWeatherByCoords(lat, lon);
+    } else if (city && typeof city === 'string' && city.trim().length > 0) {
+      console.log("[Routine API] Using city from request:", city);
+      weather = await getWeatherData(city.trim());
+    } else if (profileCity) {
+      console.log("[Routine API] Using profile city:", profileCity);
+      weather = await getWeatherData(profileCity);
+    } else {
+      weather = { temperature: 25, humidity: 55, uvIndex: 5, description: "Clear", city: "Your Location" };
+    }
+
+    console.log("[Routine API] Weather city:", weather.city);
 
     // Get latest skin analysis
     const { data: latestAnalysis } = await supabase
@@ -53,16 +72,6 @@ Latest skin analysis findings:
 - Key concerns: ${analysisJson.concerns?.join("; ") || "none"}
 
 IMPORTANT: Tailor every step to these specific findings. If acne is moderate or severe, include a targeted acne treatment step. If PIH is present, include a Vitamin C or niacinamide step. If severely dehydrated, include a hydrating essence step. If oiliness is high, recommend gel-based products only.` : "";
-
-    // Get weather
-    let weather;
-    if (lat && lon) {
-      weather = await getWeatherByCoords(lat, lon);
-    } else if (profileCity) {
-      weather = await getWeatherData(profileCity);
-    } else {
-      weather = { temperature: 25, humidity: 55, uvIndex: 5, description: "Clear", city: "Your Location" };
-    }
 
     const apiKey = process.env.GOOGLE_GEMINI_API_KEY;
     let morning, evening;

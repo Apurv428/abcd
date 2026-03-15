@@ -22,15 +22,31 @@ export default function ReminderBanner() {
 
   const fetchAlerts = useCallback(async () => {
     try {
-      // Try geolocation first
-      let weather;
-      try {
-        const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
-          navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 })
-        );
-        weather = await getWeatherByCoords(pos.coords.latitude, pos.coords.longitude);
-      } catch {
-        // Fallback to profile city
+      let weather = null;
+      let locationSource = 'none';
+
+      // Try geolocation first with better options
+      if (navigator.geolocation) {
+        try {
+          const pos = await new Promise<GeolocationPosition>((resolve, reject) => 
+            navigator.geolocation.getCurrentPosition(resolve, reject, { 
+              timeout: 6000, 
+              maximumAge: 300000,
+              enableHighAccuracy: false 
+            })
+          );
+          weather = await getWeatherByCoords(pos.coords.latitude, pos.coords.longitude);
+          locationSource = 'geolocation';
+          console.log('[ReminderBanner] Using geolocation:', weather.city);
+        } catch (err) {
+          console.warn('[ReminderBanner] Geolocation failed:', err);
+          // Fallback to profile city
+          locationSource = 'profile';
+        }
+      }
+
+      // If no weather yet, try profile city
+      if (!weather) {
         try {
           const supabase = createClient();
           const { data: { user } } = await supabase.auth.getUser();
@@ -38,31 +54,31 @@ export default function ReminderBanner() {
             const { data: profile } = await supabase.from("profiles").select("city").eq("id", user.id).single();
             if (profile?.city) {
               weather = await getWeatherData(profile.city);
+              console.log('[ReminderBanner] Using profile city:', profile.city);
             }
           }
         } catch { /* ignore */ }
       }
 
-      if (weather) {
-        // Sync with profile if detected automatically
+      // Sync detected city back to profile (only if we got it from geolocation)
+      if (weather && locationSource === 'geolocation' && weather.city && weather.city !== "Your Location") {
         try {
           const supabase = createClient();
           const { data: { user } } = await supabase.auth.getUser();
-          if (user && weather.city && weather.city !== "Your Location") {
-            // Only update if profile city is different or missing
-            const { data: profile } = await supabase.from("profiles").select("city, country").eq("id", user.id).single();
+          if (user) {
+            const { data: profile } = await supabase.from("profiles").select("city").eq("id", user.id).single();
             if (profile && profile.city !== weather.city) {
               await supabase.from("profiles").update({
                 city: weather.city,
                 updated_at: new Date().toISOString()
               }).eq("id", user.id);
+              console.log('[ReminderBanner] Synced city to profile:', weather.city);
             }
           }
         } catch { /* ignore sync failure */ }
       }
 
       if (!weather) {
-        // Time-based fallback
         weather = { temperature: 25, humidity: 55, uvIndex: 0, description: "Clear", city: "Your Location" };
       }
 

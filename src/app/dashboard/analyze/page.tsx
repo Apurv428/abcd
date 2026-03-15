@@ -83,6 +83,60 @@ function AnalyzeContent() {
   const searchParams = useSearchParams();
   const supabase = createClient();
 
+  async function uploadAnalysisImage(
+    processedDataUrl: string,
+    analysisId: string
+  ): Promise<string | null> {
+    try {
+      console.log('[Upload] Starting image upload for analysis:', analysisId)
+      console.log('[Upload] Image data URL length:', processedDataUrl.length)
+
+      const { data: { user }, error: authError } = await supabase.auth.getUser()
+      if (authError || !user) {
+        console.error('[Upload] Auth error:', authError?.message)
+        return null
+      }
+      console.log('[Upload] User ID:', user.id)
+
+      const fetchRes = await fetch(processedDataUrl)
+      const blob = await fetchRes.blob()
+      console.log('[Upload] Blob size:', blob.size, 'type:', blob.type)
+
+      if (blob.size === 0) {
+        console.error('[Upload] Blob is empty — dataUrl conversion failed')
+        return null
+      }
+
+      const compressed = await imageCompression(
+        new File([blob], 'analysis.jpg', { type: 'image/jpeg' }),
+        { maxSizeMB: 0.8, maxWidthOrHeight: 1200, useWebWorker: true }
+      )
+      console.log('[Upload] Compressed size:', compressed.size)
+
+      const filePath = `${user.id}/${analysisId}.jpg`
+      console.log('[Upload] Uploading to path:', filePath)
+
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('skin-analyses')
+        .upload(filePath, compressed, {
+          contentType: 'image/jpeg',
+          upsert: true,
+        })
+
+      if (uploadError) {
+        console.error('[Upload] Storage upload error:', uploadError.message, uploadError)
+        return null
+      }
+
+      console.log('[Upload] SUCCESS. Path:', uploadData.path)
+      return filePath
+
+    } catch (err: any) {
+      console.error('[Upload] Unexpected error:', err.message, err)
+      return null
+    }
+  }
+
   useEffect(() => {
     const id = searchParams.get("id");
     if (id) {
@@ -199,6 +253,27 @@ function AnalyzeContent() {
       try { data = JSON.parse(text); } catch { throw new Error("Invalid response format"); }
       if (!res.ok) throw new Error(data.error || "Analysis failed");
       setResult(data.analysis);
+
+      // Upload image and save to DB
+      if (data.analysis?.id && finalImage) {
+        const savedAnalysisId = data.analysis.id;
+        console.log('[Analyze] Got analysis ID:', savedAnalysisId);
+        
+        const imagePath = await uploadAnalysisImage(finalImage, savedAnalysisId);
+        
+        if (imagePath) {
+          const { error: updateError } = await supabase
+            .from('skin_analyses')
+            .update({ image_url: imagePath })
+            .eq('id', savedAnalysisId)
+
+          if (updateError) {
+            console.error('[Upload] Failed to save image_url to DB:', updateError.message)
+          } else {
+            console.log('[Upload] image_url saved to DB:', imagePath)
+          }
+        }
+      }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "An error occurred";
       setError(message);
@@ -281,9 +356,9 @@ function AnalyzeContent() {
             <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>or click to browse • JPG, PNG, WEBP up to 10MB</p>
             <input id="imageUpload" type="file" accept="image/jpeg,image/png,image/webp" onChange={handleFileSelect} style={{ display: "none" }} />
           </label>
-          <div className="disclaimer-banner" style={{ marginTop: "16px" }}>
+          <div className="disclaimer-banner" style={{ marginTop: "16px", background: "rgba(45, 212, 191, 0.1)", border: "1px solid rgba(45, 212, 191, 0.2)" }}>
             <Shield size={12} style={{ display: "inline", marginRight: "6px" }} />
-            {category === "face" ? "Your images are processed securely. FaceDefender™ anonymizes the eye region." : "Images are processed securely for area-specific analysis."}
+            {category === "face" ? "Privacy: Only the eye-masked image is saved. Original photos are never stored." : "Images are processed securely for area-specific analysis."}
           </div>
         </div>
       )}
